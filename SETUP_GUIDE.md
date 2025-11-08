@@ -7,6 +7,12 @@
 3. **PostgreSQL 15+** - [Download](https://www.postgresql.org/download/)
 4. **Google Gemini API Key** - [Get one here](https://makersuite.google.com/app/apikey)
 
+## Important Notes
+
+- The project now includes **DeepFace** for facial recognition with 4096-dimensional vector embeddings
+- TensorFlow will be installed automatically (may take some time)
+- First run may download face detection models (~100MB)
+
 ## Step 1: Database Setup
 
 1. Install PostgreSQL and pgvector extension:
@@ -60,7 +66,12 @@ ALLOWED_ORIGINS=http://localhost:3000
 
 6. Run database migrations:
 ```bash
-alembic revision --autogenerate -m "Initial migration"
+alembic upgrade head
+```
+
+Note: All migrations are already included in the repository. If you need to create new ones:
+```bash
+alembic revision --autogenerate -m "Description of changes"
 alembic upgrade head
 ```
 
@@ -93,12 +104,50 @@ The app should open automatically at `http://localhost:3000`
 
 ## How to Use
 
-### 1. Add a Contact
-- Click the "+" button in the sidebar
-- Enter the person's name and email
-- Click "Create Contact"
+### 1. Add a Contact (with Face Recognition)
+1. Click the "+" button in the sidebar
+2. Enter the person's name
+3. (Optional) Enter email and relationship
+4. **Upload a face photo** by clicking the camera icon
+   - Photo will be automatically processed
+   - Face embedding will be extracted and stored
+   - Supported formats: JPG, PNG, WebP
+5. Click "Create Contact"
 
-### 2. Add a Conversation
+**Note:** If no face is detected in the uploaded image, the contact will still be created but without facial recognition capabilities.
+
+### 2. Testing Face Recognition
+
+#### Upload a Photo to Existing Contact:
+1. Create a contact without a photo first
+2. Use the API endpoint: `POST /api/partners/{partner_id}/upload-image`
+3. Or add this feature to the UI later
+
+#### Search by Face (API only for now):
+```bash
+# Using curl to search for a person by their photo:
+curl -X POST "http://localhost:8000/api/partners/search-by-face" \
+  -F "image=@path/to/photo.jpg" \
+  -F "threshold=0.6" \
+  -F "top_k=5"
+```
+
+This will return:
+- List of matching partners
+- Similarity scores (0-1, higher is better)
+- Number of matches found
+
+#### Test via Swagger UI:
+1. Go to `http://localhost:8000/docs`
+2. Find `/partners/create-with-image` endpoint
+3. Click "Try it out"
+4. Fill in the form:
+   - name: "John Doe"
+   - relationship: "Friend"
+   - image: Upload a face photo
+5. Execute and check response
+
+### 3. Add a Conversation
 - Select a contact from the sidebar
 - Click "New Conversation"
 - Add messages alternating between you and your partner
@@ -110,7 +159,7 @@ The AI will automatically:
 - Generate a summary
 - Create conversation suggestions
 
-### 3. Get Suggestions
+### 4. Get Suggestions
 - Click on the "Suggestions" tab to see:
   - Conversation starters
   - Follow-up questions
@@ -142,25 +191,32 @@ The AI will automatically:
 
 **Core Tables:**
 - `users` - User accounts
-- `conversation_partners` - People you talk to
+- `conversation_partners` - People you talk to (with face embeddings)
 - `conversations` - Conversation sessions with embeddings
 - `messages` - Individual messages
 - `extracted_facts` - Categorized facts with confidence scores
 - `topics` - Discussion topics (many-to-many with conversations)
 
 **Key Features:**
-- **Vector embeddings** (768-dimensional) for semantic similarity search
+- **Conversation embeddings** (4096-dimensional) for semantic similarity search
+- **Face embeddings** (4096-dimensional) using DeepFace Facenet512 model
 - **Categorized facts** for easy filtering and retrieval
 - **Confidence scores** to prioritize reliable information
 - **Temporal tracking** to see how information evolves
 - **Topic tagging** for quick context retrieval
+- **Face recognition** for identifying people from photos
 
 ## API Endpoints
 
 ### Partners
-- `POST /api/partners` - Create contact
+- `POST /api/partners` - Create contact (JSON)
+- `POST /api/partners/create-with-image` - Create contact with face photo (multipart/form-data)
 - `GET /api/partners` - List all contacts
 - `GET /api/partners/{id}` - Get specific contact
+- `PUT /api/partners/{id}` - Update contact
+- `DELETE /api/partners/{id}` - Delete contact
+- `POST /api/partners/{id}/upload-image` - Upload face photo to existing contact
+- `POST /api/partners/search-by-face` - Search for partners by face photo
 
 ### Conversations
 - `POST /api/conversations` - Create conversation
@@ -176,7 +232,7 @@ The AI will automatically:
 **Database Connection Error:**
 - Make sure PostgreSQL is running
 - Check DATABASE_URL in `.env`
-- Verify pgvector extension is installed
+- Verify pgvector extension is installed: `CREATE EXTENSION vector;`
 
 **Gemini API Error:**
 - Verify your GOOGLE_API_KEY is correct
@@ -187,14 +243,84 @@ The AI will automatically:
 - Check ALLOWED_ORIGINS in `.env` includes `http://localhost:3000`
 - Restart the backend server after changing `.env`
 
+**Face Recognition Issues:**
+- "No face detected": Ensure the photo has a clear, visible face
+- Slow first upload: DeepFace downloads models on first use (~100MB)
+- TensorFlow warnings: These are normal and can be ignored
+- Low similarity scores: Try photos with better lighting and frontal view
+
+**File Upload Errors:**
+- Ensure `uploads/faces` directory exists or will be created automatically
+- Check file size limits (default is usually 10MB for FastAPI)
+- Verify image format is supported (JPG, PNG, WebP)
+
+**Migration Errors:**
+- If you get "relationship is not callable" error, ensure you're using the latest code
+- Run `alembic downgrade -1` then `alembic upgrade head` to retry
+- Check that all model files import `relationship as sa_relationship`
+
+## Testing the Face Recognition Feature
+
+### From the Website (Frontend):
+
+1. **Start both backend and frontend servers**
+2. **Open** `http://localhost:3000`
+3. **Click the "+" button** in the sidebar to add a new contact
+4. **Fill in the form:**
+   - Name: "Test Person"
+   - Email: (optional)
+   - Relationship: "Friend" (optional)
+5. **Click the camera icon** to upload a photo
+   - Select a clear photo with a visible face
+   - You should see a preview of the image
+6. **Click "Create Contact"**
+7. **Check the browser console** for any errors
+8. **Verify in the database** that the embedding was stored:
+```sql
+SELECT id, name, image_path,
+       CASE WHEN image_embedding IS NULL THEN 'No' ELSE 'Yes' END as has_embedding
+FROM conversation_partners;
+```
+
+### Using Swagger UI (Recommended for Testing):
+
+1. **Open** `http://localhost:8000/docs`
+2. **Find** `/partners/create-with-image` endpoint
+3. **Click "Try it out"**
+4. **Fill in:**
+   - name: "John Doe"
+   - relationship: "Colleague"
+   - image: Click "Choose File" and select a face photo
+5. **Click "Execute"**
+6. **Check response:**
+   - Should return status 201
+   - Response body should include `image_path` and partner details
+   - `image_embedding` won't be visible in response (it's in database)
+
+### Testing Face Search:
+
+1. **Create 2-3 partners** with different face photos
+2. **Use Swagger UI** at `http://localhost:8000/docs`
+3. **Find** `/partners/search-by-face` endpoint
+4. **Upload a photo** of one of the people you added
+5. **Set parameters:**
+   - threshold: 0.6 (adjust between 0-1)
+   - top_k: 5
+6. **Execute and check results:**
+   - Should return matching partners
+   - Similarity scores close to 1.0 = very similar
+   - Scores < 0.6 = not very similar
+
 ## Next Steps
 
-1. **Add Authentication**: Implement user login/signup
-2. **Real-time Sync**: Add WebSocket for live updates
-3. **Mobile App**: Create React Native version
-4. **Voice Input**: Add speech-to-text for conversations
-5. **Reminders**: Set reminders for important facts
-6. **Export**: Export conversation history as PDF
+1. **Add Face Search to UI**: Create a search-by-photo button in frontend
+2. **Add Authentication**: Implement user login/signup
+3. **Real-time Sync**: Add WebSocket for live updates
+4. **Mobile App**: Create React Native version with camera integration
+5. **Voice Input**: Add speech-to-text for conversations
+6. **Reminders**: Set reminders for important facts
+7. **Export**: Export conversation history as PDF
+8. **Bulk Face Processing**: Upload multiple photos at once
 
 ## Support
 

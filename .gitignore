@@ -65,3 +65,7 @@ NUL
 # Jupyter notebooks (optional - remove if you want to commit notebooks)
 *.ipynb
 .ipynb_checkpoints/
+
+# Uploaded files
+backend/uploads/
+uploads/

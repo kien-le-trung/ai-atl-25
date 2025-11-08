@@ -10,6 +10,8 @@ interface Partner {
   name: string;
   email?: string;
   phone?: string;
+  relationship?: string;
+  image_path?: string;
 }
 
 function App() {
@@ -32,9 +34,19 @@ function App() {
     }
   };
 
-  const handleCreatePartner = async (name: string, email?: string) => {
+  const handleCreatePartner = async (
+    name: string,
+    email?: string,
+    relationship?: string,
+    image?: File
+  ) => {
     try {
-      const newPartner = await apiService.createPartner({ name, email });
+      const newPartner = await apiService.createPartnerWithImage({
+        name,
+        email,
+        relationship,
+        image,
+      });
       setPartners([...partners, newPartner]);
       return newPartner;
     } catch (error) {

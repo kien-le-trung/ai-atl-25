@@ -5,13 +5,15 @@ interface Partner {
   id: number;
   name: string;
   email?: string;
+  relationship?: string;
+  image_path?: string;
 }
 
 interface Props {
   partners: Partner[];
   selectedPartnerId: number | null;
   onSelectPartner: (id: number) => void;
-  onCreatePartner: (name: string, email?: string) => Promise<any>;
+  onCreatePartner: (name: string, email?: string, relationship?: string, image?: File) => Promise<any>;
   loading: boolean;
 }
 
@@ -25,7 +27,22 @@ const PartnerList: React.FC<Props> = ({
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [relationship, setRelationship] = useState('');
+  const [image, setImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
   const [creating, setCreating] = useState(false);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,9 +50,17 @@ const PartnerList: React.FC<Props> = ({
 
     setCreating(true);
     try {
-      await onCreatePartner(name, email || undefined);
+      await onCreatePartner(
+        name,
+        email || undefined,
+        relationship || undefined,
+        image || undefined
+      );
       setName('');
       setEmail('');
+      setRelationship('');
+      setImage(null);
+      setImagePreview('');
       setShowForm(false);
     } catch (error) {
       alert('Failed to create partner');
@@ -68,6 +93,31 @@ const PartnerList: React.FC<Props> = ({
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
+          <input
+            type="text"
+            placeholder="Relationship (optional)"
+            value={relationship}
+            onChange={(e) => setRelationship(e.target.value)}
+          />
+          <div className="image-upload">
+            <label htmlFor="partner-image" className="image-upload-label">
+              {imagePreview ? (
+                <img src={imagePreview} alt="Preview" className="image-preview" />
+              ) : (
+                <div className="upload-placeholder">
+                  <span>📷</span>
+                  <span>Upload Photo</span>
+                </div>
+              )}
+            </label>
+            <input
+              id="partner-image"
+              type="file"
+              accept="image/*"
+              onChange={handleImageChange}
+              style={{ display: 'none' }}
+            />
+          </div>
           <button type="submit" disabled={creating}>
             {creating ? 'Creating...' : 'Create Contact'}
           </button>

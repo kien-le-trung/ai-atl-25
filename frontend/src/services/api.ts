@@ -15,6 +15,9 @@ export interface Partner {
   email?: string;
   phone?: string;
   notes?: string;
+  relationship?: string;
+  image_path?: string;
+  image_url?: string;
 }
 
 export interface Message {
@@ -61,6 +64,54 @@ export const apiService = {
 
   async createPartner(data: { name: string; email?: string; phone?: string }): Promise<Partner> {
     const response = await apiClient.post('/partners', data);
+    return response.data;
+  },
+
+  async createPartnerWithImage(data: {
+    name: string;
+    email?: string;
+    relationship?: string;
+    notes?: string;
+    image?: File;
+  }): Promise<Partner> {
+    const formData = new FormData();
+    formData.append('name', data.name);
+    if (data.email) formData.append('email', data.email);
+    if (data.relationship) formData.append('relationship', data.relationship);
+    if (data.notes) formData.append('notes', data.notes);
+    if (data.image) formData.append('image', data.image);
+
+    const response = await apiClient.post('/partners/create-with-image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  async uploadPartnerImage(partnerId: number, image: File): Promise<Partner> {
+    const formData = new FormData();
+    formData.append('image', image);
+
+    const response = await apiClient.post(`/partners/${partnerId}/upload-image`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  async searchPartnersByFace(image: File, threshold?: number, topK?: number): Promise<any> {
+    const formData = new FormData();
+    formData.append('image', image);
+    if (threshold !== undefined) formData.append('threshold', threshold.toString());
+    if (topK !== undefined) formData.append('top_k', topK.toString());
+
+    const response = await apiClient.post('/partners/search-by-face', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data;
   },
 
