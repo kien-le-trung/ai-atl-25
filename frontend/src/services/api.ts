@@ -1,6 +1,43 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+const resolveApiBaseUrl = (): string => {
+  const envUrl = process.env.REACT_APP_API_URL;
+
+  if (!envUrl || envUrl.trim().length === 0) {
+    return 'http://localhost:8000/api';
+  }
+
+  const trimmed = envUrl.trim();
+
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+
+  if (trimmed.startsWith('//')) {
+    return `${window.location.protocol}${trimmed}`;
+  }
+
+  if (trimmed.startsWith(':')) {
+    return `${window.location.protocol}//${window.location.hostname}${trimmed}`;
+  }
+
+  if (trimmed.startsWith('/')) {
+    return `${window.location.origin}${trimmed}`;
+  }
+
+  return trimmed;
+};
+
+export const API_BASE_URL = resolveApiBaseUrl();
+
+export const API_BASE_ORIGIN = (() => {
+  try {
+    const url = new URL(API_BASE_URL);
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return 'http://localhost:8000';
+  }
+})();
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -35,6 +72,13 @@ export interface Conversation {
   started_at: string;
   messages?: Message[];
   topics?: string[];
+  full_transcript?: string | null;
+}
+
+export interface ConversationDetail extends Conversation {
+  messages: Message[];
+  topics: string[];
+  extracted_facts: Fact[];
 }
 
 export interface Suggestions {
@@ -136,7 +180,7 @@ export const apiService = {
     return response.data;
   },
 
-  async getConversation(id: number): Promise<Conversation> {
+  async getConversation(id: number): Promise<ConversationDetail> {
     const response = await apiClient.get(`/conversations/${id}`);
     return response.data;
   },

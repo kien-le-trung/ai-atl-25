@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 
 
@@ -10,6 +10,9 @@ class Settings(BaseSettings):
 
     # Google Gemini
     GOOGLE_API_KEY: str
+
+    # Deepgram (for live transcription)
+    DEEPGRAM_API_KEY: str = ""
 
     # Application
     SECRET_KEY: str
@@ -24,9 +27,11 @@ class Settings(BaseSettings):
         """Parse ALLOWED_ORIGINS into a list."""
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="allow"
+    )
 
 
 settings = Settings()

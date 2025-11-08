@@ -40,15 +40,27 @@ class ConversationResponse(BaseModel):
     started_at: datetime
     ended_at: Optional[datetime]
     created_at: datetime
+    full_transcript: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+
+class FactResponse(BaseModel):
+    """Schema for extracted fact response."""
+    id: int
+    category: str
+    fact_key: str
+    fact_value: str
+    confidence: float
+    extracted_at: str
 
 
 class ConversationDetailResponse(ConversationResponse):
     """Schema for detailed conversation response with messages."""
     messages: List[MessageResponse]
     topics: List[str] = []
+    extracted_facts: List[FactResponse] = []
 
 
 class AnalysisResponse(BaseModel):
@@ -72,12 +84,3 @@ class SuggestionsResponse(BaseModel):
     follow_up_questions: List[str]
     new_topic_suggestions: List[str]
 
-
-class FactResponse(BaseModel):
-    """Schema for extracted fact response."""
-    id: int
-    category: str
-    fact_key: str
-    fact_value: str
-    confidence: float
-    extracted_at: str

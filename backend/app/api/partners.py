@@ -5,6 +5,7 @@ from app.core.database import get_db
 from app.models import ConversationPartner
 from app.schemas import PartnerCreate, PartnerUpdate, PartnerResponse
 from app.services import face_service
+from app.utils.db_helpers import get_next_id
 import logging
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,7 @@ def create_partner(
 ):
     """Create a new conversation partner."""
     db_partner = ConversationPartner(
+        id=get_next_id(db, ConversationPartner),
         user_id=user_id,
         **partner.model_dump()
     )

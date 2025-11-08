@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, Boolean, text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -9,7 +9,7 @@ class ExtractedFact(Base):
 
     __tablename__ = "extracted_facts"
 
-    id = Column(Integer, primary_key=True, index=True, server_default=text("nextval('extracted_facts_id_seq')"))
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     partner_id = Column(Integer, ForeignKey("conversation_partners.id"), nullable=False)
     conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=True)
     category = Column(String, nullable=False)  # e.g., 'interest', 'preference', 'life_event', 'relationship'

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from app.core.database import get_db
-from app.models import Conversation
+from app.models import Conversation, ExtractedFact
 from app.schemas import (
     ConversationCreate,
     ConversationResponse,
@@ -66,11 +66,36 @@ def get_conversation(
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
+    # Fetch extracted facts tied to this conversation
+    fact_records = db.query(ExtractedFact).filter(
+        ExtractedFact.conversation_id == conversation_id
+    ).order_by(ExtractedFact.confidence.desc()).all()
+
+    # Build transcript fallback if the stored transcript is empty
+    full_transcript = conversation.full_transcript
+    if not full_transcript and conversation.messages:
+        full_transcript = "\n".join(
+            f"{msg.timestamp.isoformat() if msg.timestamp else ''} [{msg.sender}]: {msg.content}"
+            for msg in conversation.messages
+        )
+
     # Format response
     return {
         **conversation.__dict__,
+        "full_transcript": full_transcript,
         "messages": conversation.messages,
-        "topics": [topic.name for topic in conversation.topics]
+        "topics": [topic.name for topic in conversation.topics],
+        "extracted_facts": [
+            {
+                "id": fact.id,
+                "category": fact.category,
+                "fact_key": fact.fact_key,
+                "fact_value": fact.fact_value,
+                "confidence": fact.confidence,
+                "extracted_at": fact.extracted_at.isoformat() if fact.extracted_at else ""
+            }
+            for fact in fact_records
+        ]
     }
 
 

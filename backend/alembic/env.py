@@ -2,9 +2,12 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from alembic import context
+import alembic.ddl.impl as alembic_impl
 import sys
 import os
 
+# Treat DuckDB like SQLite for Alembic DDL
+alembic_impl._impls["duckdb"] = alembic_impl._impls["sqlite"]
 # Add the parent directory to the path so we can import our app
 sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -73,7 +76,8 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
         )
 
         with context.begin_transaction():

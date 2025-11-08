@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean, text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy.types import JSON
@@ -10,11 +10,12 @@ class Conversation(Base):
 
     __tablename__ = "conversations"
 
-    id = Column(Integer, primary_key=True, index=True, server_default=text("nextval('conversations_id_seq')"))
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     partner_id = Column(Integer, ForeignKey("conversation_partners.id"), nullable=False)
     title = Column(String, nullable=True)
     summary = Column(Text, nullable=True)
+    full_transcript = Column(Text, nullable=True)
     is_analyzed = Column(Boolean, default=False)
     started_at = Column(DateTime(timezone=True), server_default=func.now())
     ended_at = Column(DateTime(timezone=True), nullable=True)
@@ -36,7 +37,7 @@ class Message(Base):
 
     __tablename__ = "messages"
 
-    id = Column(Integer, primary_key=True, index=True, server_default=text("nextval('messages_id_seq')"))
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=False)
     sender = Column(String, nullable=False)  # 'user' or 'partner'
     content = Column(Text, nullable=False)

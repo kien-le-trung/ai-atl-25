@@ -7,9 +7,6 @@ Create Date: 2025-11-07 23:50:41.111815
 """
 from alembic import op
 import sqlalchemy as sa
-from pgvector.sqlalchemy import Vector
-
-
 # revision identifiers, used by Alembic.
 revision = '7c6f95c34259'
 down_revision = None
@@ -65,7 +62,7 @@ def upgrade() -> None:
     sa.Column('ended_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('embedding', Vector(768), nullable=True),
+    sa.Column('embedding', sa.JSON(), nullable=True),
     sa.ForeignKeyConstraint(['partner_id'], ['conversation_partners.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')

@@ -1,9 +1,13 @@
+import logging
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from app.models import Conversation, Message, ExtractedFact, Topic, ConversationPartner
+from app.utils.db_helpers import get_next_id
 from app.services.gemini_service import gemini_service
 from sqlalchemy import desc
+
+logger = logging.getLogger(__name__)
 
 
 class ConversationService:
@@ -35,7 +39,7 @@ class ConversationService:
             user_id=user_id,
             partner_id=partner_id,
             title=title,
-            started_at=datetime.utcnow()
+            started_at=datetime.now(timezone.utc)
         )
         db.add(conversation)
         db.flush()
@@ -80,19 +84,40 @@ class ConversationService:
         if conversation.is_analyzed:
             raise ValueError(f"Conversation {conversation_id} already analyzed")
 
-        # Get messages
+        transcript_text = (conversation.full_transcript or '').strip()
+
+        # Get stored messages for fallback/context
         messages = db.query(Message).filter(
             Message.conversation_id == conversation_id
         ).order_by(Message.timestamp).all()
 
-        # Format messages for analysis
+        if not transcript_text and messages:
+            transcript_text = "\n".join(
+                f"{msg.timestamp.isoformat() if msg.timestamp else ''} [{msg.sender}]: {msg.content}"
+                for msg in messages
+            )
+
+        if not transcript_text:
+            logger.warning(f"No transcript content available for conversation {conversation_id}")
+            return {
+                'summary': '',
+                'main_topics': [],
+                'extracted_facts': [],
+                'sentiment': 'unknown',
+                'key_insights': [],
+                'suggested_topics': [],
+                'suggested_questions': [],
+                'action_items': []
+            }
+
+        # Format transcript as a single message for analysis
         message_data = [
             {
-                'sender': msg.sender,
-                'content': msg.content,
-                'timestamp': msg.timestamp
+                'sender': 'system',
+                'content': transcript_text,
+                'timestamp': conversation.started_at or datetime.now(timezone.utc),
+                'is_transcript': True
             }
-            for msg in messages
         ]
 
         # Get partner name
@@ -113,6 +138,7 @@ class ConversationService:
         # Store extracted facts
         for fact_data in analysis.get('extracted_facts', []):
             fact = ExtractedFact(
+                id=get_next_id(db, ExtractedFact),
                 partner_id=conversation.partner_id,
                 conversation_id=conversation.id,
                 category=fact_data.get('category', 'general'),
@@ -121,13 +147,17 @@ class ConversationService:
                 confidence=fact_data.get('confidence', 0.8)
             )
             db.add(fact)
+            db.flush()
 
         # Store topics
         for topic_name in analysis.get('main_topics', []):
             # Check if topic exists
             topic = db.query(Topic).filter(Topic.name == topic_name).first()
             if not topic:
-                topic = Topic(name=topic_name)
+                topic = Topic(
+                    id=get_next_id(db, Topic),
+                    name=topic_name
+                )
                 db.add(topic)
                 db.flush()
 
@@ -136,8 +166,8 @@ class ConversationService:
                 conversation.topics.append(topic)
 
         # Generate and store embedding for semantic search
-        conversation_text = " ".join([msg['content'] for msg in message_data])
-        summary_text = f"{conversation.summary} {conversation_text[:500]}"
+        conversation_text = transcript_text
+        summary_text = f"{conversation.summary} {conversation_text[:500]}" if conversation.summary else conversation_text[:500]
 
         try:
             embedding = await gemini_service.generate_embedding(summary_text)
@@ -145,7 +175,7 @@ class ConversationService:
         except Exception as e:
             print(f"Failed to generate embedding: {e}")
 
-        conversation.ended_at = datetime.utcnow()
+        conversation.ended_at = datetime.now(timezone.utc)
         db.commit()
 
         return analysis

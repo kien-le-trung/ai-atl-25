@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './ConversationView.css';
-import { apiService, Conversation } from '../services/api';
+import { apiService, Conversation, ConversationDetail } from '../services/api';
 
 interface Props {
   partnerId: number;
@@ -14,6 +14,10 @@ const ConversationView: React.FC<Props> = ({ partnerId }) => {
     { sender: 'user', content: '' },
   ]);
   const [creating, setCreating] = useState(false);
+  const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
+  const [conversationDetail, setConversationDetail] = useState<ConversationDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
 
   useEffect(() => {
     loadConversations();
@@ -28,6 +32,52 @@ const ConversationView: React.FC<Props> = ({ partnerId }) => {
       console.error('Failed to load conversations:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (conversations.length === 0) {
+      setSelectedConversationId(null);
+      setConversationDetail(null);
+      return;
+    }
+
+    if (!selectedConversationId || !conversations.find(conv => conv.id === selectedConversationId)) {
+      const first = conversations[0];
+      setSelectedConversationId(first.id);
+      loadConversationDetail(first.id);
+    }
+  }, [conversations]);
+
+  const loadConversationDetail = async (conversationId: number) => {
+    setDetailLoading(true);
+    try {
+      const detail = await apiService.getConversation(conversationId);
+      setConversationDetail(detail);
+    } catch (error) {
+      console.error('Failed to load conversation detail:', error);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const handleSelectConversation = (conversationId: number) => {
+    setSelectedConversationId(conversationId);
+    loadConversationDetail(conversationId);
+  };
+
+  const handleAnalyzeConversation = async () => {
+    if (!selectedConversationId) return;
+    setAnalyzing(true);
+    try {
+      await apiService.analyzeConversation(selectedConversationId);
+      await loadConversations();
+      await loadConversationDetail(selectedConversationId);
+    } catch (error) {
+      console.error('Failed to analyze conversation:', error);
+      alert('Analysis failed');
+    } finally {
+      setAnalyzing(false);
     }
   };
 
@@ -115,29 +165,97 @@ const ConversationView: React.FC<Props> = ({ partnerId }) => {
           <p>Click "New Conversation" to add your first conversation.</p>
         </div>
       ) : (
-        <div className="conversation-list">
-          {conversations.map((conv) => (
-            <div key={conv.id} className="conversation-card">
-              <div className="conversation-date">
-                {new Date(conv.started_at).toLocaleDateString()}
-              </div>
-              {conv.summary && (
-                <div className="conversation-summary">{conv.summary}</div>
-              )}
-              {conv.topics && conv.topics.length > 0 && (
-                <div className="conversation-topics">
-                  {conv.topics.map((topic, i) => (
-                    <span key={i} className="topic-tag">
-                      {topic}
-                    </span>
-                  ))}
+        <div className="conversation-content">
+          <div className="conversation-list">
+            {conversations.map((conv) => (
+              <button
+                key={conv.id}
+                className={`conversation-card ${selectedConversationId === conv.id ? 'active' : ''}`}
+                onClick={() => handleSelectConversation(conv.id)}
+              >
+                <div className="conversation-date">
+                  {new Date(conv.started_at).toLocaleDateString()}
                 </div>
-              )}
-              <div className="conversation-status">
-                {conv.is_analyzed ? '✓ Analyzed' : 'Not analyzed'}
+                {conv.summary && (
+                  <div className="conversation-summary">{conv.summary}</div>
+                )}
+                <div className="conversation-status">
+                  {conv.is_analyzed ? '✓ Analyzed' : 'Not analyzed'}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <div className="conversation-detail-panel">
+            {detailLoading ? (
+              <div className="loading">Loading conversation...</div>
+            ) : !conversationDetail ? (
+              <div className="detail-placeholder">
+                Select a conversation to view transcript and analysis.
               </div>
-            </div>
-          ))}
+            ) : (
+              <div className="conversation-detail">
+                <div className="detail-header">
+                  <div>
+                    <div className="conversation-date">
+                      {new Date(conversationDetail.started_at).toLocaleString()}
+                    </div>
+                    <div className="conversation-status">
+                      {conversationDetail.is_analyzed ? '✓ Analyzed' : 'Not analyzed'}
+                    </div>
+                  </div>
+                  {!conversationDetail.is_analyzed && (
+                    <button onClick={handleAnalyzeConversation} disabled={analyzing}>
+                      {analyzing ? 'Analyzing...' : 'Analyze Conversation'}
+                    </button>
+                  )}
+                </div>
+
+                {conversationDetail.summary && (
+                  <section>
+                    <h4>Summary</h4>
+                    <p>{conversationDetail.summary}</p>
+                  </section>
+                )}
+
+                <section>
+                  <h4>Transcript</h4>
+                  {conversationDetail.full_transcript ? (
+                    <pre className="transcript-block">
+                      {conversationDetail.full_transcript}
+                    </pre>
+                  ) : (
+                    <div className="empty-state">No transcript captured.</div>
+                  )}
+                </section>
+
+                {conversationDetail.extracted_facts && conversationDetail.extracted_facts.length > 0 && (
+                  <section>
+                    <h4>Extracted Facts</h4>
+                    <ul className="fact-list">
+                      {conversationDetail.extracted_facts.map((fact) => (
+                        <li key={fact.id}>
+                          <span className="fact-key">{fact.fact_key}:</span>
+                          <span>{fact.fact_value}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+
+                {conversationDetail.topics && conversationDetail.topics.length > 0 && (
+                  <section>
+                    <h4>Topics</h4>
+                    <div className="conversation-topics">
+                      {conversationDetail.topics.map((topic, index) => (
+                        <span key={index} className="topic-tag">{topic}</span>
+                      ))}
+                    </div>
+                  </section>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

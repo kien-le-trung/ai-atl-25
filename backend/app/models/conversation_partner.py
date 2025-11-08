@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship as sa_relationship
 from sqlalchemy.sql import func
 from sqlalchemy.types import JSON
@@ -10,7 +10,7 @@ class ConversationPartner(Base):
 
     __tablename__ = "conversation_partners"
 
-    id = Column(Integer, primary_key=True, index=True, server_default=text("nextval('conversation_partners_id_seq')"))
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     name = Column(String, nullable=False)
     email = Column(String, nullable=True)

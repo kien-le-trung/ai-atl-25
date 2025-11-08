@@ -193,8 +193,11 @@ Make the suggestions natural, friendly, and show genuine interest. Avoid being t
         """Format messages into a readable conversation."""
         formatted = []
         for msg in messages:
-            sender = "You" if msg['sender'] == 'user' else msg.get('partner_name', 'Partner')
-            formatted.append(f"{sender}: {msg['content']}")
+            if msg.get('is_transcript'):
+                formatted.append(msg['content'])
+            else:
+                sender = "You" if msg['sender'] == 'user' else msg.get('partner_name', 'Partner')
+                formatted.append(f"{sender}: {msg['content']}")
         return "\n".join(formatted)
 
     def _format_facts(self, facts: List[Dict[str, Any]]) -> str:
