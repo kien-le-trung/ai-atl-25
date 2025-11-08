@@ -1,7 +1,7 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, text
 from sqlalchemy.orm import relationship as sa_relationship
 from sqlalchemy.sql import func
-from pgvector.sqlalchemy import Vector
+from sqlalchemy.types import JSON
 from app.core.database import Base
 
 
@@ -10,7 +10,7 @@ class ConversationPartner(Base):
 
     __tablename__ = "conversation_partners"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, index=True, server_default=text("nextval('conversation_partners_id_seq')"))
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     name = Column(String, nullable=False)
     email = Column(String, nullable=True)
@@ -19,7 +19,7 @@ class ConversationPartner(Base):
     relationship = Column(String, nullable=True)  # Relationship to user (friend, colleague, etc.)
     image_url = Column(String, nullable=True)  # URL/path to partner's image (legacy)
     image_path = Column(String, nullable=True)  # Local path to uploaded face image
-    image_embedding = Column(Vector(4096), nullable=True)  # 4096-dim vector for face recognition
+    image_embedding = Column(JSON, nullable=True)  # 4096-dim vector for face recognition stored as JSON array
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

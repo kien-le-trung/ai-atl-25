@@ -4,8 +4,7 @@
 
 1. **Python 3.11+** - [Download](https://www.python.org/downloads/)
 2. **Node.js 18+** - [Download](https://nodejs.org/)
-3. **PostgreSQL 15+** - [Download](https://www.postgresql.org/download/)
-4. **Google Gemini API Key** - [Get one here](https://makersuite.google.com/app/apikey)
+3. **Google Gemini API Key** - [Get one here](https://makersuite.google.com/app/apikey)
 
 ## Important Notes
 
@@ -15,16 +14,11 @@
 
 ## Step 1: Database Setup
 
-1. Install PostgreSQL and pgvector extension:
-```bash
-# On Windows with PostgreSQL installed:
-# Open pgAdmin or psql and run:
-CREATE DATABASE conversation_ai;
-
-# Connect to the database and enable pgvector:
-\c conversation_ai
-CREATE EXTENSION vector;
-```
+The project now uses **DuckDB**, a fast in-process SQL database:
+- No separate database server installation required
+- Database file (`conversation_ai.db`) will be created automatically
+- All data stored locally in a single file
+- Perfect for development and small to medium deployments
 
 ## Step 2: Backend Setup
 
@@ -56,7 +50,7 @@ copy .env.example .env
 
 5. Edit `.env` file with your settings:
 ```env
-DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/conversation_ai
+DATABASE_URL=duckdb:///./conversation_ai.db
 GOOGLE_API_KEY=your_gemini_api_key_here
 SECRET_KEY=any-random-secret-key
 DEBUG=True
@@ -64,16 +58,20 @@ ENVIRONMENT=development
 ALLOWED_ORIGINS=http://localhost:3000
 ```
 
-6. Run database migrations:
+6. Initialize the database:
 ```bash
+# Option 1: Use the initialization script (recommended)
+# On Mac/Linux:
+python3 init_db.py
+
+# On Windows:
+python init_db.py
+
+# Option 2: Use Alembic migrations (if you have migration files)
 alembic upgrade head
 ```
 
-Note: All migrations are already included in the repository. If you need to create new ones:
-```bash
-alembic revision --autogenerate -m "Description of changes"
-alembic upgrade head
-```
+Note: The database file will be created in the backend directory as `conversation_ai.db`
 
 7. Start the backend server:
 ```bash
@@ -198,7 +196,8 @@ The AI will automatically:
 - `topics` - Discussion topics (many-to-many with conversations)
 
 **Key Features:**
-- **Conversation embeddings** (4096-dimensional) for semantic similarity search
+- **DuckDB database** - Fast in-process database with single-file storage
+- **Conversation embeddings** (4096-dimensional) stored as JSON arrays for semantic similarity
 - **Face embeddings** (4096-dimensional) using DeepFace Facenet512 model
 - **Categorized facts** for easy filtering and retrieval
 - **Confidence scores** to prioritize reliable information
@@ -230,9 +229,9 @@ The AI will automatically:
 ## Troubleshooting
 
 **Database Connection Error:**
-- Make sure PostgreSQL is running
-- Check DATABASE_URL in `.env`
-- Verify pgvector extension is installed: `CREATE EXTENSION vector;`
+- Make sure the `conversation_ai.db` file has write permissions
+- Check DATABASE_URL in `.env` is set to `duckdb:///./conversation_ai.db`
+- If database is corrupted, delete `conversation_ai.db` and run `python init_db.py` again
 
 **Gemini API Error:**
 - Verify your GOOGLE_API_KEY is correct
@@ -276,10 +275,9 @@ The AI will automatically:
 6. **Click "Create Contact"**
 7. **Check the browser console** for any errors
 8. **Verify in the database** that the embedding was stored:
-```sql
-SELECT id, name, image_path,
-       CASE WHEN image_embedding IS NULL THEN 'No' ELSE 'Yes' END as has_embedding
-FROM conversation_partners;
+```bash
+# You can use the DuckDB CLI or Python to query:
+python -c "import duckdb; conn = duckdb.connect('conversation_ai.db'); print(conn.execute('SELECT id, name, image_path, CASE WHEN image_embedding IS NULL THEN \"No\" ELSE \"Yes\" END as has_embedding FROM conversation_partners').fetchall())"
 ```
 
 ### Using Swagger UI (Recommended for Testing):

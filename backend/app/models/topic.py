@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -19,7 +19,7 @@ class Topic(Base):
 
     __tablename__ = "topics"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, index=True, server_default=text("nextval('topics_id_seq')"))
     name = Column(String, unique=True, nullable=False, index=True)
     category = Column(String, nullable=True)  # e.g., 'work', 'hobby', 'family'
     created_at = Column(DateTime(timezone=True), server_default=func.now())
