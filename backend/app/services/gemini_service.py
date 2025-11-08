@@ -71,33 +71,7 @@ Be thorough and extract as much useful information as possible while maintaining
 """
 
         try:
-            response = self.model.generate_content(prompt)
-            # Parse the JSON response
-            result_text = response.text.strip()
-
-            # Remove markdown code blocks if present
-            if result_text.startswith("```json"):
-                result_text = result_text[7:]
-            if result_text.startswith("```"):
-                result_text = result_text[3:]
-            if result_text.endswith("```"):
-                result_text = result_text[:-3]
-
-            result = json.loads(result_text.strip())
-            return result
-        except json.JSONDecodeError as e:
-            # If JSON parsing fails, return a basic structure
-            return {
-                "summary": response.text[:200] if hasattr(response, 'text') else "Analysis failed",
-                "main_topics": [],
-                "extracted_facts": [],
-                "sentiment": "neutral",
-                "key_insights": [],
-                "suggested_topics": [],
-                "suggested_questions": [],
-                "action_items": [],
-                "error": str(e)
-            }
+            return self._generate_json_response(prompt)
         except Exception as e:
             raise Exception(f"Failed to analyze conversation: {str(e)}")
 
@@ -147,19 +121,7 @@ Make the suggestions natural, friendly, and show genuine interest. Avoid being t
 """
 
         try:
-            response = self.model.generate_content(prompt)
-            result_text = response.text.strip()
-
-            # Remove markdown code blocks if present
-            if result_text.startswith("```json"):
-                result_text = result_text[7:]
-            if result_text.startswith("```"):
-                result_text = result_text[3:]
-            if result_text.endswith("```"):
-                result_text = result_text[:-3]
-
-            result = json.loads(result_text.strip())
-            return result
+            return self._generate_json_response(prompt)
         except Exception as e:
             # Return default suggestions if generation fails
             return {
@@ -212,6 +174,49 @@ Make the suggestions natural, friendly, and show genuine interest. Avoid being t
             value = fact.get('fact_value', '')
             formatted.append(f"- [{category}] {key}: {value}")
         return "\n".join(formatted)
+
+    def _generate_json_response(self, prompt: str, retry: bool = True) -> Dict[str, Any]:
+        response = self.model.generate_content(prompt)
+        result_text = response.text.strip()
+
+        cleaned = self._strip_code_fences(result_text)
+        try:
+            result = json.loads(cleaned)
+            if isinstance(result, dict):
+                return result
+        except json.JSONDecodeError:
+            if retry:
+                clarification_prompt = (
+                    "Your previous response was not valid JSON. "
+                    "Respond again strictly as JSON matching the requested schema, with no commentary."
+                )
+                return self._generate_json_response(
+                    prompt + "\n" + clarification_prompt,
+                    retry=False
+                )
+
+        return {
+            "summary": result_text[:200],
+            "main_topics": [],
+            "extracted_facts": [],
+            "sentiment": "neutral",
+            "key_insights": [],
+            "suggested_topics": [],
+            "suggested_questions": [],
+            "action_items": [],
+            "raw_response": result_text
+        }
+
+    @staticmethod
+    def _strip_code_fences(text: str) -> str:
+        cleaned = text.strip()
+        if cleaned.startswith("```json"):
+            cleaned = cleaned[7:]
+        if cleaned.startswith("```"):
+            cleaned = cleaned[3:]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+        return cleaned.strip()
 
 
 # Singleton instance

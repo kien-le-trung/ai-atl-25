@@ -61,6 +61,7 @@ class ConversationSession:
         self.audio_queue = None
         self.transcripts = deque(maxlen=100)
         self.transcript_lines: List[str] = []
+        self.transcript_char_count = 0
         self.detected_partner_name: Optional[str] = None
         self.last_name_detection_at: Optional[datetime] = None
         self.input_device_index: Optional[int] = None
@@ -154,6 +155,10 @@ class ConversationSession:
                         self.transcripts.append(transcript_entry)
                         pretty_line = f"[{timestamp}] {transcript_text.strip()}"
                         self.transcript_lines.append(pretty_line)
+                        self.transcript_char_count += len(pretty_line) + 1
+                        if self.transcript_char_count > 20000 and len(self.transcript_lines) > 50:
+                            removed = self.transcript_lines.pop(0)
+                            self.transcript_char_count -= len(removed) + 1
                         logger.info(f"[Session {self.session_id}] [{timestamp}] {transcript_text}")
                         print(f"[Session {self.session_id}] {transcript_text}", flush=True)
 

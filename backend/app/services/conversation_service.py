@@ -151,12 +151,15 @@ class ConversationService:
 
         # Store topics
         for topic_name in analysis.get('main_topics', []):
-            # Check if topic exists
-            topic = db.query(Topic).filter(Topic.name == topic_name).first()
+            normalized = topic_name.strip()
+            normalized_key = normalized.lower()
+
+            # Check if topic exists (case-insensitive)
+            topic = db.query(Topic).filter(Topic.name.ilike(normalized_key)).first()
             if not topic:
                 topic = Topic(
                     id=get_next_id(db, Topic),
-                    name=topic_name
+                    name=normalized
                 )
                 db.add(topic)
                 db.flush()
