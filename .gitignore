@@ -40,10 +40,15 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+package-lock.json
 
 # React build
 frontend/build/
 frontend/dist/
+dist/
+
+# TypeScript
+*.tsbuildinfo
 
 # Database
 *.db
@@ -69,3 +74,6 @@ NUL
 # Uploaded files
 backend/uploads/
 uploads/
+
+# Backup directories
+frontend_backup/
