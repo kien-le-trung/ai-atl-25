@@ -10,9 +10,15 @@ class Settings(BaseSettings):
 
     # Google Gemini
     GOOGLE_API_KEY: str
+    GEMINI_API_KEY: str = ""  # For google.genai library (different from GOOGLE_API_KEY)
 
     # Deepgram (for live transcription)
     DEEPGRAM_API_KEY: str = ""
+
+    # Vapi (for voice AI calls)
+    VAPI_API_KEY: str = ""
+    VAPI_ASSISTANT_ID: str = ""
+    VAPI_PHONE_NUMBER_ID: str = ""
 
     # Application
     SECRET_KEY: str

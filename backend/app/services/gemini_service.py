@@ -1,6 +1,10 @@
 import google.generativeai as genai
-from typing import List, Dict, Any
+from google import genai as genai_client
+from google.genai import types
+from typing import List, Dict, Any, AsyncGenerator
 import json
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from app.core.config import settings
 
 # Configure Gemini API
@@ -13,6 +17,11 @@ class GeminiService:
     def __init__(self):
         # Use gemini-2.0-flash - fast and efficient
         self.model = genai.GenerativeModel('models/gemini-2.0-flash')
+        # Initialize client for advanced features (search with thinking)
+        self.api_key = settings.GEMINI_API_KEY or settings.GOOGLE_API_KEY
+        self.client = genai_client.Client(api_key=self.api_key) if self.api_key else None
+        # Thread pool for running blocking operations
+        self.executor = ThreadPoolExecutor(max_workers=4)
 
     async def analyze_conversation(
         self,
@@ -206,6 +215,74 @@ Make the suggestions natural, friendly, and show genuine interest. Avoid being t
             "action_items": [],
             "raw_response": result_text
         }
+
+    async def search_with_thinking(
+        self,
+        prompt: str,
+        temperature: float = 0.2,
+        thinking_budget: int = -1
+    ) -> AsyncGenerator[str, None]:
+        """
+        Perform a web search using Gemini 2.5 RPO with thinking capabilities.
+
+        Args:
+            prompt: The search query/prompt
+            temperature: Generation temperature (0.0-1.0)
+            thinking_budget: Thinking budget (-1 for unlimited)
+
+        Yields:
+            Chunks of generated text as they become available
+        """
+        if not self.client:
+            raise Exception("Gemini client not initialized. Please check GEMINI_API_KEY configuration.")
+
+        # Use gemini-2.0-flash-thinking-exp which supports thinking capabilities
+        model = "gemini-2.0-flash-thinking-exp"
+
+        contents = [
+            types.Content(
+                role="user",
+                parts=[
+                    types.Part.from_text(text=prompt),
+                ],
+            ),
+        ]
+
+        generate_content_config = types.GenerateContentConfig(
+            temperature=temperature,
+            thinking_config=types.ThinkingConfig(
+                thinking_budget=thinking_budget,
+            ),
+            image_config=types.ImageConfig(
+                image_size="1K",
+            ),
+        )
+
+        try:
+            # Run the synchronous streaming call in an executor
+            loop = asyncio.get_event_loop()
+
+            def generate_sync():
+                """Synchronous generator function."""
+                chunks = []
+                for chunk in self.client.models.generate_content_stream(
+                    model=model,
+                    contents=contents,
+                    config=generate_content_config,
+                ):
+                    if chunk.text:
+                        chunks.append(chunk.text)
+                return chunks
+
+            # Execute in thread pool and wait for all chunks
+            chunks = await loop.run_in_executor(self.executor, generate_sync)
+
+            # Yield all chunks
+            for chunk in chunks:
+                yield chunk
+
+        except Exception as e:
+            raise Exception(f"Search failed: {str(e)}")
 
     @staticmethod
     def _strip_code_fences(text: str) -> str:

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api import partners, conversations, suggestions, sessions, profiles
+from app.api import partners, conversations, suggestions, sessions, profiles, search, calls
 
 # Create FastAPI app
 app = FastAPI(
@@ -25,6 +25,8 @@ app.include_router(conversations.router, prefix="/api")
 app.include_router(suggestions.router, prefix="/api")
 app.include_router(sessions.router)
 app.include_router(profiles.router)
+app.include_router(search.router)
+app.include_router(calls.router)
 
 
 @app.get("/")
