@@ -6,11 +6,28 @@ import cv2
 import numpy as np
 from typing import Optional, Tuple, List
 import logging
-from deepface import DeepFace
 import tempfile
 import os
+import threading
 
 logger = logging.getLogger(__name__)
+
+# Lazy-load DeepFace to avoid blocking startup
+_deepface = None
+_deepface_lock = threading.Lock()
+
+
+def _get_deepface():
+    """Lazy-load DeepFace module to avoid blocking startup"""
+    global _deepface
+    if _deepface is None:
+        with _deepface_lock:
+            if _deepface is None:  # Double-check locking
+                logger.info("Loading DeepFace models...")
+                from deepface import DeepFace as DF
+                _deepface = DF
+                logger.info("DeepFace models loaded")
+    return _deepface
 
 
 class CameraService:
@@ -188,6 +205,9 @@ class CameraService:
             Face embedding as list, or None if extraction failed
         """
         try:
+            # Lazy-load DeepFace
+            DeepFace = _get_deepface()
+
             # Save face to temporary file (DeepFace requires file path)
             with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
                 tmp_path = tmp.name

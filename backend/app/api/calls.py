@@ -174,7 +174,7 @@ def create_call_with_context(request: CreateCallWithContextRequest):
 
 
 @router.get("/{call_id}")
-def get_call(call_id: str):
+async def get_call(call_id: str):
     """
     Get call details and transcript.
 
@@ -195,7 +195,7 @@ def get_call(call_id: str):
     try:
         logger.info(f"Retrieving call: {call_id}")
 
-        call_data = vapi_service.get_call(call_id)
+        call_data = await vapi_service.get_call(call_id)
 
         return {
             "success": True,
@@ -211,7 +211,7 @@ def get_call(call_id: str):
 
 
 @router.get("/")
-def list_calls(limit: int = 10):
+async def list_calls(limit: int = 10):
     """
     List recent calls.
 
@@ -237,7 +237,7 @@ def list_calls(limit: int = 10):
                 detail="Limit must be between 1 and 100"
             )
 
-        calls_data = vapi_service.list_calls(limit=limit)
+        calls_data = await vapi_service.list_calls(limit=limit)
 
         return {
             "success": True,

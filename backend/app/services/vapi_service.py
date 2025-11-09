@@ -2,7 +2,7 @@
 Vapi service for making AI-powered phone calls.
 """
 import logging
-import requests
+import httpx
 from typing import Dict, Any, Optional
 from vapi import Vapi
 from app.core.config import settings
@@ -89,7 +89,7 @@ class VapiService:
             logger.error(f"Failed to create call: {e}")
             raise Exception(f"Failed to create call: {str(e)}")
 
-    def get_call(self, call_id: str) -> Dict[str, Any]:
+    async def get_call(self, call_id: str) -> Dict[str, Any]:
         """
         Get call details and transcript.
 
@@ -108,32 +108,32 @@ class VapiService:
         try:
             logger.info(f"Retrieving call: {call_id}")
 
-            response = requests.get(
-                f"https://api.vapi.ai/call/{call_id}",
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                timeout=20
-            )
-            response.raise_for_status()
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                response = await client.get(
+                    f"https://api.vapi.ai/call/{call_id}",
+                    headers={"Authorization": f"Bearer {self.api_key}"}
+                )
+                response.raise_for_status()
 
-            call_data = response.json()
-            logger.info(f"Call retrieved successfully: {call_id}")
+                call_data = response.json()
+                logger.info(f"Call retrieved successfully: {call_id}")
 
-            return {
-                "id": call_data.get("id"),
-                "status": call_data.get("status"),
-                "transcript": call_data.get("transcript", ""),
-                "duration": call_data.get("duration"),
-                "started_at": call_data.get("startedAt"),
-                "ended_at": call_data.get("endedAt"),
-                "cost": call_data.get("cost"),
-                "metadata": call_data
-            }
+                return {
+                    "id": call_data.get("id"),
+                    "status": call_data.get("status"),
+                    "transcript": call_data.get("transcript", ""),
+                    "duration": call_data.get("duration"),
+                    "started_at": call_data.get("startedAt"),
+                    "ended_at": call_data.get("endedAt"),
+                    "cost": call_data.get("cost"),
+                    "metadata": call_data
+                }
 
-        except requests.exceptions.RequestException as e:
+        except httpx.HTTPError as e:
             logger.error(f"Failed to retrieve call {call_id}: {e}")
             raise Exception(f"Failed to retrieve call: {str(e)}")
 
-    def list_calls(self, limit: int = 10) -> Dict[str, Any]:
+    async def list_calls(self, limit: int = 10) -> Dict[str, Any]:
         """
         List recent calls.
 
@@ -152,23 +152,23 @@ class VapiService:
         try:
             logger.info(f"Listing calls (limit: {limit})")
 
-            response = requests.get(
-                "https://api.vapi.ai/call",
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                params={"limit": limit},
-                timeout=20
-            )
-            response.raise_for_status()
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                response = await client.get(
+                    "https://api.vapi.ai/call",
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    params={"limit": limit}
+                )
+                response.raise_for_status()
 
-            calls_data = response.json()
-            logger.info(f"Retrieved {len(calls_data)} calls")
+                calls_data = response.json()
+                logger.info(f"Retrieved {len(calls_data)} calls")
 
-            return {
-                "calls": calls_data,
-                "count": len(calls_data)
-            }
+                return {
+                    "calls": calls_data,
+                    "count": len(calls_data)
+                }
 
-        except requests.exceptions.RequestException as e:
+        except httpx.HTTPError as e:
             logger.error(f"Failed to list calls: {e}")
             raise Exception(f"Failed to list calls: {str(e)}")
 

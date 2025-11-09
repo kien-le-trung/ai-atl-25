@@ -1,13 +1,12 @@
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
 sqlalchemy==2.0.25
-duckdb>=1.4.0
-duckdb-engine>=0.11.2
+psycopg2-binary==2.9.9
 alembic==1.13.1
 pydantic==2.5.3
 pydantic-settings==2.1.0
 python-dotenv==1.0.0
-google-generativeai==0.8.3
+requests==2.31.0
 numpy==1.26.4
 pandas<2.0
 python-multipart==0.0.6
@@ -20,3 +19,5 @@ tensorflow
 opencv-python==4.8.1.78
 pyaudio==0.2.14
 websockets==12.0
+deepgram-sdk>=3.0.0
+httpx>=0.24.0

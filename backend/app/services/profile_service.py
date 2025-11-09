@@ -6,7 +6,9 @@ from typing import List, Dict, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from datetime import datetime
-import google.generativeai as genai
+import httpx
+import json
+import asyncio
 
 from app.models.conversation import Conversation, Message
 from app.models.conversation_partner import ConversationPartner
@@ -14,6 +16,9 @@ from app.models.extracted_fact import ExtractedFact
 from app.models.topic import Topic, conversation_topics
 
 logger = logging.getLogger(__name__)
+
+# Gemini API endpoint
+GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
 
 
 class ProfileBuilder:
@@ -26,10 +31,10 @@ class ProfileBuilder:
         Args:
             gemini_api_key: Google Gemini API key for analysis
         """
-        genai.configure(api_key=gemini_api_key)
-        self.model = genai.GenerativeModel('gemini-pro')
+        self.api_key = gemini_api_key
+        self.model_name = "gemini-2.0-flash-exp"
 
-    def analyze_conversation(
+    async def analyze_conversation(
         self,
         conversation_id: int,
         db: Session
@@ -73,13 +78,13 @@ class ProfileBuilder:
             ])
 
             # Extract facts using Gemini
-            facts = self._extract_facts(conversation_text, conversation.partner_id, conversation_id, db)
+            facts = await self._extract_facts(conversation_text, conversation.partner_id, conversation_id, db)
 
             # Identify topics
-            topics = self._identify_topics(conversation_text, conversation_id, db)
+            topics = await self._identify_topics(conversation_text, conversation_id, db)
 
             # Generate summary
-            summary = self._generate_summary(conversation_text)
+            summary = await self._generate_summary(conversation_text)
 
             # Update conversation
             conversation.summary = summary
@@ -102,7 +107,7 @@ class ProfileBuilder:
             db.rollback()
             raise
 
-    def _extract_facts(
+    async def _extract_facts(
         self,
         conversation_text: str,
         partner_id: int,
@@ -150,8 +155,8 @@ Conversation:
 Extract facts (return only valid JSON array):
 """
 
-            response = self.model.generate_content(prompt)
-            facts_data = self._parse_json_response(response.text)
+            response_text = await self._generate_content(prompt)
+            facts_data = self._parse_json_response(response_text)
 
             # Save facts to database
             saved_facts = []
@@ -178,7 +183,7 @@ Extract facts (return only valid JSON array):
             logger.error(f"Error extracting facts: {e}")
             return []
 
-    def _identify_topics(
+    async def _identify_topics(
         self,
         conversation_text: str,
         conversation_id: int,
@@ -211,8 +216,8 @@ Conversation:
 Topics (return only valid JSON array):
 """
 
-            response = self.model.generate_content(prompt)
-            topics_data = self._parse_json_response(response.text)
+            response_text = await self._generate_content(prompt)
+            topics_data = self._parse_json_response(response_text)
 
             # Save topics to database
             conversation = db.query(Conversation).filter(
@@ -249,7 +254,7 @@ Topics (return only valid JSON array):
             logger.error(f"Error identifying topics: {e}")
             return []
 
-    def _generate_summary(self, conversation_text: str) -> str:
+    async def _generate_summary(self, conversation_text: str) -> str:
         """
         Generate a concise summary of the conversation.
 
@@ -270,12 +275,68 @@ Conversation:
 Summary:
 """
 
-            response = self.model.generate_content(prompt)
-            return response.text.strip()
+            response_text = await self._generate_content(prompt)
+            return response_text.strip()
 
         except Exception as e:
             logger.error(f"Error generating summary: {e}")
             return "Summary unavailable"
+
+    async def _generate_content(self, prompt: str) -> str:
+        """
+        Generate content using Gemini API via HTTP requests.
+
+        Args:
+            prompt: The prompt to send to Gemini
+
+        Returns:
+            Generated text response
+        """
+        url = f"{GEMINI_API_BASE}/models/{self.model_name}:generateContent"
+
+        headers = {
+            "Content-Type": "application/json"
+        }
+
+        params = {
+            "key": self.api_key
+        }
+
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": prompt}
+                    ]
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.7,
+                "topK": 40,
+                "topP": 0.95,
+                "maxOutputTokens": 8192,
+            }
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(url, headers=headers, params=params, json=payload)
+                response.raise_for_status()
+
+                result = response.json()
+
+                # Extract text from response
+                if "candidates" in result and len(result["candidates"]) > 0:
+                    candidate = result["candidates"][0]
+                    if "content" in candidate and "parts" in candidate["content"]:
+                        parts = candidate["content"]["parts"]
+                        if len(parts) > 0 and "text" in parts[0]:
+                            return parts[0]["text"].strip()
+
+                raise ValueError(f"Unexpected response format: {result}")
+
+        except httpx.HTTPError as e:
+            raise Exception(f"Gemini API request failed: {str(e)}")
 
     def _parse_json_response(self, response_text: str) -> List:
         """
@@ -287,7 +348,6 @@ Summary:
         Returns:
             Parsed JSON data
         """
-        import json
         import re
 
         # Remove markdown code blocks if present
@@ -397,7 +457,7 @@ Summary:
             logger.error(f"Error building profile for partner {partner_id}: {e}")
             raise
 
-    def get_conversation_insights(
+    async def get_conversation_insights(
         self,
         partner_id: int,
         db: Session
@@ -437,8 +497,8 @@ Suggest topics as a JSON array of strings:
 ["suggestion1", "suggestion2", "suggestion3"]
 """
 
-            response = self.model.generate_content(prompt)
-            suggestions = self._parse_json_response(response.text)
+            response_text = await self._generate_content(prompt)
+            suggestions = self._parse_json_response(response_text)
 
             return {
                 'partner_id': partner_id,

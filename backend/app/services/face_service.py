@@ -1,13 +1,14 @@
 """
-Face recognition service using DeepFace
+Face recognition service using DeepFace with lazy loading and threading
 """
 from typing import List, Optional
 import os
 import numpy as np
-from deepface import DeepFace
 from sqlalchemy.orm import Session
 from app.models.conversation_partner import ConversationPartner
 import logging
+from concurrent.futures import ThreadPoolExecutor
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,24 @@ DISTANCE_METRIC = "cosine"
 
 # Ensure upload directory exists
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# Lazy-load DeepFace to avoid blocking startup
+_deepface = None
+_deepface_lock = threading.Lock()
+_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="deepface")
+
+
+def _get_deepface():
+    """Lazy-load DeepFace module to avoid blocking startup"""
+    global _deepface
+    if _deepface is None:
+        with _deepface_lock:
+            if _deepface is None:  # Double-check locking
+                logger.info("Loading DeepFace models...")
+                from deepface import DeepFace as DF
+                _deepface = DF
+                logger.info("DeepFace models loaded")
+    return _deepface
 
 
 def extract_face_embedding(image_path: str) -> Optional[np.ndarray]:
@@ -32,6 +51,9 @@ def extract_face_embedding(image_path: str) -> Optional[np.ndarray]:
         Face embedding as numpy array, or None if no face detected
     """
     try:
+        # Lazy-load DeepFace
+        DeepFace = _get_deepface()
+
         # Use DeepFace.represent to get embeddings
         embeddings = DeepFace.represent(
             img_path=image_path,
@@ -177,6 +199,9 @@ def verify_faces(image_path1: str, image_path2: str) -> Optional[dict]:
         Dictionary with verification result or None if error
     """
     try:
+        # Lazy-load DeepFace
+        DeepFace = _get_deepface()
+
         result = DeepFace.verify(
             img1_path=image_path1,
             img2_path=image_path2,
