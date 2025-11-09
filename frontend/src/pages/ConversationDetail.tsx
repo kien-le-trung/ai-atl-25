@@ -244,7 +244,7 @@ export default function ConversationDetail() {
               <div>
                 <p className="text-sm font-medium text-muted-foreground mb-2">Topics Discussed</p>
                 <div className="flex flex-wrap gap-2">
-                  {conversation.topics.map((topic, i) => (
+                  {conversation.topics.map((topic: string, i: number) => (
                     <Badge key={i} variant="outline" data-testid={`badge-topic-${i}`}>
                       {topic}
                     </Badge>

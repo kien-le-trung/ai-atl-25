@@ -41,7 +41,7 @@ export default function Timeline() {
 
   const allTopics = conversations?.reduce((acc, conv) => {
     if (conv.topics) {
-      conv.topics.forEach((topic) => {
+      conv.topics.forEach((topic: string) => {
         if (!acc.includes(topic)) {
           acc.push(topic);
         }
@@ -74,7 +74,7 @@ export default function Timeline() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Topics</SelectItem>
-              {allTopics.map((topic) => (
+              {allTopics.map((topic: string) => (
                 <SelectItem key={topic} value={topic}>
                   {topic}
                 </SelectItem>
@@ -182,7 +182,7 @@ export default function Timeline() {
 
                     {conversation.topics && conversation.topics.length > 0 && (
                       <div className="flex flex-wrap gap-2">
-                        {conversation.topics.map((topic, i) => (
+                        {conversation.topics.map((topic: string, i: number) => (
                           <Badge key={i} variant="outline" className="text-xs" data-testid={`badge-topic-${i}`}>
                             {topic}
                           </Badge>
