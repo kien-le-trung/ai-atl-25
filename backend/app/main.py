@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api import partners, conversations, suggestions, sessions, profiles, search, calls
+from app.api import partners, conversations, suggestions, sessions, profiles, search, calls, memory
 
 # Create FastAPI app
 app = FastAPI(
@@ -20,6 +20,8 @@ app.add_middleware(
 )
 
 # Include routers
+# Memory router comes first to handle /api/* routes
+app.include_router(memory.router)
 app.include_router(partners.router, prefix="/api")
 app.include_router(conversations.router, prefix="/api")
 app.include_router(suggestions.router, prefix="/api")
